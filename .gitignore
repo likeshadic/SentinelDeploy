@@ -1,0 +1,23 @@
+# Terraform
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfvars
+backend.tf
+
+# Environment files
+.env
+.env.*
+
+# Python (FastAPI)
+__pycache__/
+*.pyc
+.venv/
+
+# Node
+node_modules/
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
