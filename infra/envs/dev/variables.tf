@@ -19,7 +19,7 @@ variable "environment" {
 variable "github_repo" {
   type        = string
   description = "Repo in owner/name form, used for tagging"
-  default     = "your-org-or-user/sentineldeploy"
+  default     = "likeshadic/sentineldeploy"
 }
 
 variable "container_image" {
