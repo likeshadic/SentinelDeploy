@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+jobs:
+  terraform_checks:
+    name: Terraform fmt/validate + IaC scan
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra/envs/dev
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform fmt
+        run: terraform fmt -check -recursive
+
+      - name: Terraform init (no backend)
+        run: terraform init -backend=false
+
+      - name: Terraform validate
+        run: terraform validate
+
+      - name: tfsec (IaC scan)
+        uses: aquasecurity/tfsec-action@v1.0.3
+        with:
+          working_directory: infra/envs/dev
+
+  codeql:
+    name: CodeQL (SAST)
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: "python,javascript" # adjust to your app language(s)
+      - uses: github/codeql-action/analyze@v3
+
+  container_scan:
+    name: Build + Trivy (container scan)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image (local)
+        run: |
+          docker build -t local/app:pr-${{ github.event.pull_request.number }} ./app
+
+      - name: Trivy scan
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: local/app:pr-${{ github.event.pull_request.number }}
+          format: table
+          exit-code: "1"
+          vuln-type: "os,library"
+          severity: "HIGH,CRITICAL"

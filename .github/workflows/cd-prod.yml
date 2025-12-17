@@ -1,0 +1,75 @@
+name: CD Prod
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  TF_WORKING_DIR: infra/envs/prod
+
+jobs:
+  deploy_prod:
+    runs-on: ubuntu-latest
+    environment: prod
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform init
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform init
+
+      - name: Terraform apply (bootstrap infra)
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform apply -auto-approve -var="demo_secret_value=${{ secrets.DEMO_SECRET_VALUE }}"
+
+      - name: Read ACR login server (terraform output)
+        id: tfout
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: |
+          echo "ACR_LOGIN_SERVER=$(terraform output -raw acr_login_server)" >> $GITHUB_OUTPUT
+          echo "APP_FQDN=$(terraform output -raw container_app_fqdn)" >> $GITHUB_OUTPUT
+
+      - name: Build image
+        run: |
+          IMAGE="${{ steps.tfout.outputs.ACR_LOGIN_SERVER }}/app:${{ github.sha }}"
+          echo "IMAGE=$IMAGE" >> $GITHUB_ENV
+          docker build -t "$IMAGE" ./app
+
+      - name: Login to ACR
+        run: |
+          az acr login --name "${{ steps.tfout.outputs.ACR_LOGIN_SERVER%%/* }}"
+
+      - name: Trivy scan
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: ${{ env.IMAGE }}
+          format: table
+          exit-code: "1"
+          vuln-type: "os,library"
+          severity: "HIGH,CRITICAL"
+
+      - name: Push image
+        run: docker push "${{ env.IMAGE }}"
+
+      - name: Terraform apply (deploy new image)
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform apply -auto-approve -var="container_image=${{ env.IMAGE }}" -var="demo_secret_value=${{ secrets.DEMO_SECRET_VALUE }}"
+
+      - name: Smoke test
+        run: |
+          echo "Testing https://${{ steps.tfout.outputs.APP_FQDN }}/health"
+          curl -fsS "https://${{ steps.tfout.outputs.APP_FQDN }}/health"
