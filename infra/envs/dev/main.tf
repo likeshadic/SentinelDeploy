@@ -51,11 +51,17 @@ resource "azurerm_key_vault" "kv" {
   resource_group_name        = azurerm_resource_group.rg.name
   tenant_id                  = data.azurerm_client_config.current.tenant_id
   sku_name                   = "standard"
-  enable_rbac_authorization  = true
+  enable_rbac_authorization  = true # or rbac_authorization_enabled depending on your provider
   soft_delete_retention_days = 7
-  purge_protection_enabled   = false
+  purge_protection_enabled   = true
   tags                       = local.tags
+
+  network_acls {
+    default_action = "Deny"
+    bypass         = "AzureServices"
+  }
 }
+
 
 # Give the deploying identity (whoever runs terraform) permissions to manage secrets in this KV.
 # In GitHub Actions, this will be the OIDC-authenticated principal.
@@ -70,8 +76,12 @@ resource "azurerm_key_vault_secret" "demo" {
   value        = var.demo_secret_value
   key_vault_id = azurerm_key_vault.kv.id
 
+  content_type    = "text/plain"
+  expiration_date = timeadd(timestamp(), "2160h") # 90 days
+
   depends_on = [azurerm_role_assignment.kv_secrets_officer_for_deployer]
 }
+
 
 # --- User-assigned Managed Identity for the running container app ---
 resource "azurerm_user_assigned_identity" "app_uai" {
@@ -112,9 +122,9 @@ locals {
 
 resource "azurerm_container_app" "app" {
   name                         = "ca-${local.name_prefix}"
-  container_app_environment_id  = azurerm_container_app_environment.cae.id
-  resource_group_name           = azurerm_resource_group.rg.name
-  revision_mode                 = "Single"
+  container_app_environment_id = azurerm_container_app_environment.cae.id
+  resource_group_name          = azurerm_resource_group.rg.name
+  revision_mode                = "Single"
 
   identity {
     type         = "UserAssigned"
@@ -127,9 +137,9 @@ resource "azurerm_container_app" "app" {
   }
 
   secret {
-    name                 = "demo-secret"
-    key_vault_secret_id  = azurerm_key_vault_secret.demo.id
-    identity             = azurerm_user_assigned_identity.app_uai.id
+    name                = "demo-secret"
+    key_vault_secret_id = azurerm_key_vault_secret.demo.id
+    identity            = azurerm_user_assigned_identity.app_uai.id
   }
 
   template {
