@@ -112,9 +112,9 @@ locals {
 
 resource "azurerm_container_app" "app" {
   name                         = "ca-${local.name_prefix}"
-  container_app_environment_id  = azurerm_container_app_environment.cae.id
-  resource_group_name           = azurerm_resource_group.rg.name
-  revision_mode                 = "Single"
+  container_app_environment_id = azurerm_container_app_environment.cae.id
+  resource_group_name          = azurerm_resource_group.rg.name
+  revision_mode                = "Single"
 
   identity {
     type         = "UserAssigned"
@@ -127,9 +127,9 @@ resource "azurerm_container_app" "app" {
   }
 
   secret {
-    name                 = "demo-secret"
-    key_vault_secret_id  = azurerm_key_vault_secret.demo.id
-    identity             = azurerm_user_assigned_identity.app_uai.id
+    name                = "demo-secret"
+    key_vault_secret_id = azurerm_key_vault_secret.demo.id
+    identity            = azurerm_user_assigned_identity.app_uai.id
   }
 
   template {
