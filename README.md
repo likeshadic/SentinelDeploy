@@ -1,4 +1,5 @@
 # SentinelDeploy
+![CI](https://github.com/likeshadic/sentineldeploy/actions/workflows/ci.yml/badge.svg)
 
 SentinelDeploy is a DevSecOps-focused deployment platform that automates the secure build and deployment of containerized applications on Microsoft Azure.
 
