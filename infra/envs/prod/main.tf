@@ -76,8 +76,12 @@ resource "azurerm_key_vault_secret" "demo" {
   value        = var.demo_secret_value
   key_vault_id = azurerm_key_vault.kv.id
 
+  content_type    = "text/plain"
+  expiration_date = timeadd(timestamp(), "2160h") # 90 days
+
   depends_on = [azurerm_role_assignment.kv_secrets_officer_for_deployer]
 }
+
 
 # --- User-assigned Managed Identity for the running container app ---
 resource "azurerm_user_assigned_identity" "app_uai" {

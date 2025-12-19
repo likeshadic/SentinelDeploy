@@ -53,7 +53,7 @@ resource "azurerm_key_vault" "kv" {
   sku_name                   = "standard"
   enable_rbac_authorization  = true # or rbac_authorization_enabled depending on your provider
   soft_delete_retention_days = 7
-  purge_protection_enabled   = false
+  purge_protection_enabled   = true
   tags                       = local.tags
 
   network_acls {
@@ -76,8 +76,12 @@ resource "azurerm_key_vault_secret" "demo" {
   value        = var.demo_secret_value
   key_vault_id = azurerm_key_vault.kv.id
 
+  content_type    = "text/plain"
+  expiration_date = timeadd(timestamp(), "2160h") # 90 days
+
   depends_on = [azurerm_role_assignment.kv_secrets_officer_for_deployer]
 }
+
 
 # --- User-assigned Managed Identity for the running container app ---
 resource "azurerm_user_assigned_identity" "app_uai" {
